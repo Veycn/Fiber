@@ -1,12 +1,33 @@
 import {arrayed, createStateNode, createTaskQueue, getTag} from "../Misc";
 
 /**
- * 任务：为每一个节点构建 fiber 对象
- *
+ * 阶段一的任务：为每一个节点构建 fiber 对象
+ * 阶段二的任务：将所有的 fiber 对象构建完成之后加入最外层fiber的effects数组中
  */
 const taskQueue = createTaskQueue()
 
 let subTask = null
+let pendingCommit = null
+
+const commitAllWork = fiber => {
+    fiber.effects.forEach(child => {
+        if (child.effectTag === 'placement') {
+            let fiber = child
+            let parentFiber = child.parent
+            /**
+             * 如果当前child 是类组件的最外层节点，假设是A
+             * 它不能被挂载到 <A/> 上，应该被挂载到 A 的父级 html 标签(host_component)
+             * 如果多个组件嵌套，那就一直往上找
+             */
+            while (parentFiber.tag === 'class_component' || parentFiber.tag === 'function_component') {
+                parentFiber = parentFiber.parent
+            }
+            if (fiber.tag === 'host_component') {
+                parentFiber.stateNode.appendChild(child.stateNode)
+            }
+        }
+    })
+}
 
 
 const getFirstTask = () => {
@@ -64,14 +85,20 @@ const reconcileChildren = (fiber, children) => {
         prevFiber = newFiber
         index++
     }
-    console.log(fiber)
 }
 
 const executeTask = fiber => {
     /**
      * 构建子级 fiber 对象
      */
-    reconcileChildren(fiber, fiber.props.children)
+    if (fiber.tag === 'class_component') {
+        reconcileChildren(fiber, fiber.stateNode.render())
+    } else if (fiber.tag === 'function_component') {
+        reconcileChildren(fiber, fiber.stateNode(fiber.props))
+    } else {
+        reconcileChildren(fiber, fiber.props.children)
+    }
+
 
     /**
      * 如果子级存在，返回子级
@@ -82,19 +109,28 @@ const executeTask = fiber => {
     }
 
     let currentExecutingFiber = fiber
-    while (currentExecutingFiber.parent){
+    while (currentExecutingFiber.parent) {
+        /**
+         * 从左侧的最后一个父节点开始
+         * 把所有子节点的 fiber 对对象收集到这个父节点的 effects 数组中
+         * 直到退回根节点，这个根节点的 effects 数组中会有所有的 fiber
+         */
+        currentExecutingFiber.parent.effects = currentExecutingFiber.parent.effects.concat(
+            currentExecutingFiber.effects.concat([currentExecutingFiber])
+        )
         /**
          * 没有子节点则判断有无同级
          * 有同级则返回同级
          */
-        if (currentExecutingFiber.sibling){
+        if (currentExecutingFiber.sibling) {
             return currentExecutingFiber.sibling
         }
         // 没有同级之后回退到当前节点的父节点
         currentExecutingFiber = currentExecutingFiber.parent
     }
 
-
+    pendingCommit = currentExecutingFiber;
+    console.log(currentExecutingFiber);
 }
 
 
@@ -112,6 +148,10 @@ const workLoop = (deadline) => {
      */
     while (subTask && deadline.timeRemaining() > 1) {
         subTask = executeTask(subTask)
+    }
+
+    if (pendingCommit) {
+        commitAllWork(pendingCommit)
     }
 }
 
