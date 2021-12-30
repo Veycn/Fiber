@@ -8,9 +8,6 @@ const jsx = (
         <p>Hello React Fiber</p>
     </div>
 )
-
-console.log(jsx)
-
 render(jsx, root)
 
 
