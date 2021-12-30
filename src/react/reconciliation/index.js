@@ -1,4 +1,5 @@
 import {arrayed, createStateNode, createTaskQueue, getTag} from "../Misc";
+import {updateNodeElement} from "../DOM";
 
 /**
  * 阶段一的任务：为每一个节点构建 fiber 对象
@@ -10,8 +11,24 @@ let subTask = null
 let pendingCommit = null
 
 const commitAllWork = fiber => {
+    /**
+     * 所有的节点变化都被收集到了 effects 中
+     * 各个节点的层级被抹平了
+     * 但是因为 fiber 元素中存储了 parent、sibling这些信息
+     * 所以即使层级被抹平了，也不会影响到节点的更新、删除、修改
+     */
     fiber.effects.forEach(child => {
-        if (child.effectTag === 'placement') {
+        if (child.effectTag === 'delete') {
+            child.parent.stateNode.removeChild(child.stateNode)
+        } else if (child.effectTag === 'update') {
+            if (child.type === child.alternate.type) {
+                // 节点类型相同
+                updateNodeElement(child.stateNode, child, child.alternate)
+            } else {
+                // 节点类型不同, 用新的节点去替换掉原来的旧节点
+                child.parent.stateNode.replaceChild(child.stateNode, child.alternate.stateNode)
+            }
+        } else if (child.effectTag === 'placement') {
             let fiber = child
             let parentFiber = child.parent
             /**
@@ -27,8 +44,16 @@ const commitAllWork = fiber => {
             }
         }
     })
-}
 
+    /**
+     * 备份旧的 fiber
+     */
+
+    fiber.stateNode.__rootFiberContainer = fiber
+
+
+    console.log(fiber)
+}
 
 const getFirstTask = () => {
     // 获取任务
@@ -39,7 +64,8 @@ const getFirstTask = () => {
         stateNode: task.dom,
         tag: 'host_root',
         effects: [],
-        child: null
+        child: null,
+        alternate: task.dom.__rootFiberContainer
     }
 }
 
@@ -59,27 +85,71 @@ const reconcileChildren = (fiber, children) => {
 
     let index = 0
     let numberOfElements = arrayedChildren.length
-    let element = null
     let newFiber = null
     let prevFiber = null
+    let element = null
+    let alternate = null
 
-    while (index < numberOfElements) {
+    /**
+     * element 和 alternate 一一对应新旧节点
+     * 如果 fiber 存在 alternate，说明这个 fiber 有备份
+     */
+
+    if (fiber.alternate && fiber.alternate.child) {
+        // fiber 的 child 是第一个子节点
+        alternate = fiber.alternate.child
+    }
+
+    while (index < numberOfElements || alternate) {
         element = arrayedChildren[index]
-        newFiber = {
-            type: element.type,
-            props: element.props,
-            tag: getTag(element),
-            effects: [],
-            effectTag: 'placement',
-            stateNode: null,
-            parent: fiber
+        if (!element && alternate) {
+            alternate.effectTag = 'delete'
+            fiber.effects.push(alternate)
+        } else if (element && alternate) {
+            // 更新
+            newFiber = {
+                type: element.type,
+                props: element.props,
+                tag: getTag(element),
+                effects: [],
+                effectTag: 'update',
+                stateNode: null,
+                parent: fiber,
+                alternate
+            }
+            if (element.type === alternate.type) {
+                // 更新的节点与之前的类型相同
+                // 将 alternate.stateNode
+                newFiber.stateNode = alternate.stateNode
+            } else {
+                // 更新的节点与之前的类型不同，重新创建一个节点
+                newFiber.stateNode = createStateNode(newFiber)
+            }
+        } else if (element && !alternate) {
+            // 初次渲染
+            newFiber = {
+                type: element.type,
+                props: element.props,
+                tag: getTag(element),
+                effects: [],
+                effectTag: 'placement',
+                stateNode: null,
+                parent: fiber
+            }
+
+            newFiber.stateNode = createStateNode(newFiber)
         }
-        newFiber.stateNode = createStateNode(newFiber)
         // 在 fiber 中，只有第一个是父级的子节点，其他的子节点都应该是第一个子节点的兄弟节点
         if (index === 0) {
             fiber.child = newFiber
-        } else {
+        } else if (element) {
             prevFiber.sibling = newFiber
+        }
+
+        if (alternate && alternate.sibling) {
+            alternate = alternate.sibling
+        } else {
+            alternate = null
         }
 
         prevFiber = newFiber
@@ -98,7 +168,6 @@ const executeTask = fiber => {
     } else {
         reconcileChildren(fiber, fiber.props.children)
     }
-
 
     /**
      * 如果子级存在，返回子级
@@ -130,9 +199,7 @@ const executeTask = fiber => {
     }
 
     pendingCommit = currentExecutingFiber;
-    console.log(currentExecutingFiber);
 }
-
 
 const workLoop = (deadline) => {
     /**
@@ -154,7 +221,6 @@ const workLoop = (deadline) => {
         commitAllWork(pendingCommit)
     }
 }
-
 
 const performTask = (deadline) => {
     // 执行任务

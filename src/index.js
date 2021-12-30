@@ -13,6 +13,15 @@ const jsx = (
         </div>
     </div>
 )
+
+const jsx2 = (
+    <div>
+        <p>Hello React Fiber</p>
+        <div>
+            <p>Fiber 111</p>
+        </div>
+    </div>
+)
 // render(jsx, root)
 
 
@@ -30,7 +39,7 @@ class Greeting extends Component{
     }
 }
 
-render(<Greeting title="奥力给"/>, root)
+// render(<Greeting title="奥力给"/>, root)
 
 
 function FunctionComponent (props){
@@ -40,3 +49,9 @@ function FunctionComponent (props){
 
 // render(<FunctionComponent title="Hello"/>, root)
 
+
+
+render(jsx, root)
+setTimeout(() => {
+    render(jsx2, root)
+}, 2000)

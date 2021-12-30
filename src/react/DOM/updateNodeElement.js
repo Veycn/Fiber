@@ -1,6 +1,32 @@
 export default function updateNodeElement(newElement, virtualDOM, oldVirtualDOM = {}) {
     const newProps = virtualDOM.props || {};
     const oldProps = oldVirtualDOM.props || {};
+
+    /**
+     * 增加文本处理能力
+     * 当文本被替换的时候，不只是替换文本
+     * 可能文本的容器从原来的 p 标签修改为了 span 或者 div 或者其他
+     * 此时如果调用 replaceChild 去替换 text 会导致意料之外的异常
+     */
+    if (virtualDOM.type === 'text') {
+        if (newProps.textContent !== oldProps.textContent) {
+            // 如果新节点的父级的类型 与 旧节点的父级的类型 不一致
+            if (virtualDOM.parent.type !== oldVirtualDOM.parent.type) {
+                virtualDOM.parent.stateNode.appendChild(
+                    document.createTextNode(newProps.textContent)
+                )
+            } else {
+                // 父级类型一直才能直接 replace
+                virtualDOM.parent.stateNode.replaceChild(
+                    document.createTextNode(newProps.textContent),
+                    oldVirtualDOM.stateNode
+                )
+            }
+
+        }
+        return
+    }
+
     Object.keys(newProps).forEach(propName => {
         // 获取存储在 props 中的属性值
         const newPropsValue = newProps[propName]
@@ -43,7 +69,7 @@ export default function updateNodeElement(newElement, virtualDOM, oldVirtualDOM 
      * 如何判断属性被删除？
      * 这里有两个 virtualDOM，一个新的一个旧的
      * 被删除的属性，在 newProps 中没有，oldProps 中存在
-     * 因此，两相对比可以直到某个属性是否被删除
+     * 因此，两相对比可以知道某个属性是否被删除
      * - 如果被删除的属性是事件， removeEventListener 移除之
      * - 如果被删除的属性是'属性'，removeAttribute 移除之
      */

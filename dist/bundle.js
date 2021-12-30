@@ -135,6 +135,27 @@ function updateNodeElement(newElement, virtualDOM) {
   var oldVirtualDOM = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   var newProps = virtualDOM.props || {};
   var oldProps = oldVirtualDOM.props || {};
+  /**
+   * 增加文本处理能力
+   * 当文本被替换的时候，不只是替换文本
+   * 可能文本的容器从原来的 p 标签修改为了 span 或者 div 或者其他
+   * 此时如果调用 replaceChild 去替换 text 会导致意料之外的异常
+   */
+
+  if (virtualDOM.type === 'text') {
+    if (newProps.textContent !== oldProps.textContent) {
+      // 如果新节点的父级的类型 与 旧节点的父级的类型 不一致
+      if (virtualDOM.parent.type !== oldVirtualDOM.parent.type) {
+        virtualDOM.parent.stateNode.appendChild(document.createTextNode(newProps.textContent));
+      } else {
+        // 父级类型一直才能直接 replace
+        virtualDOM.parent.stateNode.replaceChild(document.createTextNode(newProps.textContent), oldVirtualDOM.stateNode);
+      }
+    }
+
+    return;
+  }
+
   Object.keys(newProps).forEach(function (propName) {
     // 获取存储在 props 中的属性值
     var newPropsValue = newProps[propName];
@@ -175,7 +196,7 @@ function updateNodeElement(newElement, virtualDOM) {
    * 如何判断属性被删除？
    * 这里有两个 virtualDOM，一个新的一个旧的
    * 被删除的属性，在 newProps 中没有，oldProps 中存在
-   * 因此，两相对比可以直到某个属性是否被删除
+   * 因此，两相对比可以知道某个属性是否被删除
    * - 如果被删除的属性是事件， removeEventListener 移除之
    * - 如果被删除的属性是'属性'，removeAttribute 移除之
    */
@@ -388,6 +409,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "render": () => (/* binding */ render)
 /* harmony export */ });
 /* harmony import */ var _Misc__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Misc */ "./src/react/Misc/index.js");
+/* harmony import */ var _DOM__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../DOM */ "./src/react/DOM/index.js");
+
 
 /**
  * 阶段一的任务：为每一个节点构建 fiber 对象
@@ -399,8 +422,24 @@ var subTask = null;
 var pendingCommit = null;
 
 var commitAllWork = function commitAllWork(fiber) {
+  /**
+   * 所有的节点变化都被收集到了 effects 中
+   * 各个节点的层级被抹平了
+   * 但是因为 fiber 元素中存储了 parent、sibling这些信息
+   * 所以即使层级被抹平了，也不会影响到节点的更新、删除、修改
+   */
   fiber.effects.forEach(function (child) {
-    if (child.effectTag === 'placement') {
+    if (child.effectTag === 'delete') {
+      child.parent.stateNode.removeChild(child.stateNode);
+    } else if (child.effectTag === 'update') {
+      if (child.type === child.alternate.type) {
+        // 节点类型相同
+        (0,_DOM__WEBPACK_IMPORTED_MODULE_1__.updateNodeElement)(child.stateNode, child, child.alternate);
+      } else {
+        // 节点类型不同, 用新的节点去替换掉原来的旧节点
+        child.parent.stateNode.replaceChild(child.stateNode, child.alternate.stateNode);
+      }
+    } else if (child.effectTag === 'placement') {
       var _fiber = child;
       var parentFiber = child.parent;
       /**
@@ -418,6 +457,12 @@ var commitAllWork = function commitAllWork(fiber) {
       }
     }
   });
+  /**
+   * 备份旧的 fiber
+   */
+
+  fiber.stateNode.__rootFiberContainer = fiber;
+  console.log(fiber);
 };
 
 var getFirstTask = function getFirstTask() {
@@ -429,7 +474,8 @@ var getFirstTask = function getFirstTask() {
     stateNode: task.dom,
     tag: 'host_root',
     effects: [],
-    child: null
+    child: null,
+    alternate: task.dom.__rootFiberContainer
   };
 };
 /**
@@ -448,27 +494,72 @@ var reconcileChildren = function reconcileChildren(fiber, children) {
   var arrayedChildren = (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.arrayed)(children);
   var index = 0;
   var numberOfElements = arrayedChildren.length;
-  var element = null;
   var newFiber = null;
   var prevFiber = null;
+  var element = null;
+  var alternate = null;
+  /**
+   * element 和 alternate 一一对应新旧节点
+   * 如果 fiber 存在 alternate，说明这个 fiber 有备份
+   */
 
-  while (index < numberOfElements) {
+  if (fiber.alternate && fiber.alternate.child) {
+    // fiber 的 child 是第一个子节点
+    alternate = fiber.alternate.child;
+  }
+
+  while (index < numberOfElements || alternate) {
     element = arrayedChildren[index];
-    newFiber = {
-      type: element.type,
-      props: element.props,
-      tag: (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.getTag)(element),
-      effects: [],
-      effectTag: 'placement',
-      stateNode: null,
-      parent: fiber
-    };
-    newFiber.stateNode = (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.createStateNode)(newFiber); // 在 fiber 中，只有第一个是父级的子节点，其他的子节点都应该是第一个子节点的兄弟节点
+
+    if (!element && alternate) {
+      alternate.effectTag = 'delete';
+      fiber.effects.push(alternate);
+    } else if (element && alternate) {
+      // 更新
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        tag: (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.getTag)(element),
+        effects: [],
+        effectTag: 'update',
+        stateNode: null,
+        parent: fiber,
+        alternate: alternate
+      };
+
+      if (element.type === alternate.type) {
+        // 更新的节点与之前的类型相同
+        // 将 alternate.stateNode
+        newFiber.stateNode = alternate.stateNode;
+      } else {
+        // 更新的节点与之前的类型不同，重新创建一个节点
+        newFiber.stateNode = (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.createStateNode)(newFiber);
+      }
+    } else if (element && !alternate) {
+      // 初次渲染
+      newFiber = {
+        type: element.type,
+        props: element.props,
+        tag: (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.getTag)(element),
+        effects: [],
+        effectTag: 'placement',
+        stateNode: null,
+        parent: fiber
+      };
+      newFiber.stateNode = (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.createStateNode)(newFiber);
+    } // 在 fiber 中，只有第一个是父级的子节点，其他的子节点都应该是第一个子节点的兄弟节点
+
 
     if (index === 0) {
       fiber.child = newFiber;
-    } else {
+    } else if (element) {
       prevFiber.sibling = newFiber;
+    }
+
+    if (alternate && alternate.sibling) {
+      alternate = alternate.sibling;
+    } else {
+      alternate = null;
     }
 
     prevFiber = newFiber;
@@ -520,7 +611,6 @@ var executeTask = function executeTask(fiber) {
   }
 
   pendingCommit = currentExecutingFiber;
-  console.log(currentExecutingFiber);
 };
 
 var workLoop = function workLoop(deadline) {
@@ -667,7 +757,8 @@ function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.g
 var root = document.getElementById('root');
 var jsx = /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("p", null, "Hello React Fiber"), /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("p", null, "Fiber"), /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("span", {
   style: "color: red"
-}, "\u2665"))); // render(jsx, root)
+}, "\u2665")));
+var jsx2 = /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("p", null, "Hello React Fiber"), /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("p", null, "Fiber 111"))); // render(jsx, root)
 
 var Greeting = /*#__PURE__*/function (_Component) {
   _inherits(Greeting, _Component);
@@ -688,15 +779,18 @@ var Greeting = /*#__PURE__*/function (_Component) {
   }]);
 
   return Greeting;
-}(_react_Component__WEBPACK_IMPORTED_MODULE_2__["default"]);
+}(_react_Component__WEBPACK_IMPORTED_MODULE_2__["default"]); // render(<Greeting title="奥力给"/>, root)
 
-(0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)( /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement(Greeting, {
-  title: "\u5965\u529B\u7ED9"
-}), root);
 
 function FunctionComponent(props) {
   return /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, props.title, ", FunctionComponent");
 } // render(<FunctionComponent title="Hello"/>, root)
+
+
+(0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)(jsx, root);
+setTimeout(function () {
+  (0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)(jsx2, root);
+}, 2000);
 })();
 
 /******/ })()
