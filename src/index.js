@@ -28,18 +28,23 @@ const jsx2 = (
 class Greeting extends Component{
     constructor(props) {
         super(props);
+        this.state = {
+            name: 'zs'
+        }
     }
 
     render() {
         return (
             <div>
                 {this.props.title}
+                <p> { this.state.name }</p>
+                <button onClick={() => this.setState({ name: 'ls' })}>点我修改状态</button>
             </div>
         );
     }
 }
 
-// render(<Greeting title="奥力给"/>, root)
+render(<Greeting title="奥力给"/>, root)
 
 
 function FunctionComponent (props){
@@ -51,7 +56,7 @@ function FunctionComponent (props){
 
 
 
-render(jsx, root)
-setTimeout(() => {
-    render(jsx2, root)
-}, 2000)
+// render(jsx, root)
+// setTimeout(() => {
+//     render(jsx2, root)
+// }, 2000)

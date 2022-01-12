@@ -12,17 +12,31 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (/* binding */ Component)
 /* harmony export */ });
+/* harmony import */ var _reconciliation__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reconciliation */ "./src/react/reconciliation/index.js");
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
 function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
 
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
 
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var Component = /*#__PURE__*/_createClass(function Component(props) {
-  _classCallCheck(this, Component);
 
-  this.props = props;
-});
+var Component = /*#__PURE__*/function () {
+  function Component(props) {
+    _classCallCheck(this, Component);
+
+    this.props = props;
+  }
+
+  _createClass(Component, [{
+    key: "setState",
+    value: function setState(partialState) {
+      (0,_reconciliation__WEBPACK_IMPORTED_MODULE_0__.scheduleUpdate)(this, partialState);
+    }
+  }]);
+
+  return Component;
+}();
 
 
 
@@ -320,6 +334,30 @@ var createTaskQueue = function createTaskQueue() {
 
 /***/ }),
 
+/***/ "./src/react/Misc/GetRoot/index.js":
+/*!*****************************************!*\
+  !*** ./src/react/Misc/GetRoot/index.js ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+var getRoot = function getRoot(instance) {
+  var fiber = instance.__fiber;
+
+  while (fiber.parent) {
+    fiber = fiber.parent;
+  }
+
+  return fiber;
+};
+
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (getRoot);
+
+/***/ }),
+
 /***/ "./src/react/Misc/GetTag/index.js":
 /*!****************************************!*\
   !*** ./src/react/Misc/GetTag/index.js ***!
@@ -359,13 +397,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "arrayed": () => (/* reexport safe */ _Arrayed__WEBPACK_IMPORTED_MODULE_1__["default"]),
 /* harmony export */   "createStateNode": () => (/* reexport safe */ _CreateStateNode__WEBPACK_IMPORTED_MODULE_2__["default"]),
 /* harmony export */   "getTag": () => (/* reexport safe */ _GetTag__WEBPACK_IMPORTED_MODULE_3__["default"]),
-/* harmony export */   "createReactInstance": () => (/* reexport safe */ _CreateReactInstance__WEBPACK_IMPORTED_MODULE_4__["default"])
+/* harmony export */   "createReactInstance": () => (/* reexport safe */ _CreateReactInstance__WEBPACK_IMPORTED_MODULE_4__["default"]),
+/* harmony export */   "getRoot": () => (/* reexport safe */ _GetRoot__WEBPACK_IMPORTED_MODULE_5__["default"])
 /* harmony export */ });
 /* harmony import */ var _CreateTaskQueue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CreateTaskQueue */ "./src/react/Misc/CreateTaskQueue/index.js");
 /* harmony import */ var _Arrayed__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Arrayed */ "./src/react/Misc/Arrayed/index.js");
 /* harmony import */ var _CreateStateNode__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./CreateStateNode */ "./src/react/Misc/CreateStateNode/index.js");
 /* harmony import */ var _GetTag__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./GetTag */ "./src/react/Misc/GetTag/index.js");
 /* harmony import */ var _CreateReactInstance__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./CreateReactInstance */ "./src/react/Misc/CreateReactInstance/index.js");
+/* harmony import */ var _GetRoot__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./GetRoot */ "./src/react/Misc/GetRoot/index.js");
+
 
 
 
@@ -406,10 +447,17 @@ __webpack_require__.r(__webpack_exports__);
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "render": () => (/* binding */ render)
+/* harmony export */   "render": () => (/* binding */ render),
+/* harmony export */   "scheduleUpdate": () => (/* binding */ scheduleUpdate)
 /* harmony export */ });
 /* harmony import */ var _Misc__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../Misc */ "./src/react/Misc/index.js");
 /* harmony import */ var _DOM__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../DOM */ "./src/react/DOM/index.js");
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
+
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { _defineProperty(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 
 
 /**
@@ -429,6 +477,11 @@ var commitAllWork = function commitAllWork(fiber) {
    * 所以即使层级被抹平了，也不会影响到节点的更新、删除、修改
    */
   fiber.effects.forEach(function (child) {
+    if (child.tag === 'class_component') {
+      // 将类组件的 fiber 备份到实例身上，后续类组件状态更新使用
+      child.stateNode.__fiber = child;
+    }
+
     if (child.effectTag === 'delete') {
       child.parent.stateNode.removeChild(child.stateNode);
     } else if (child.effectTag === 'update') {
@@ -467,7 +520,23 @@ var commitAllWork = function commitAllWork(fiber) {
 
 var getFirstTask = function getFirstTask() {
   // 获取任务
-  var task = taskQueue.pop(); // 返回最外层节点的 fiber 对象
+  var task = taskQueue.pop();
+
+  if (task.from === 'class_component') {
+    // task.instance.__fiber
+    var root = (0,_Misc__WEBPACK_IMPORTED_MODULE_0__.getRoot)(task.instance);
+    console.log(root);
+    task.instance.__fiber.partialState = task.partialState;
+    return {
+      props: root.props,
+      stateNode: root.stateNode,
+      tag: 'host_root',
+      effects: [],
+      child: null,
+      alternate: root
+    };
+  } // 返回最外层节点的 fiber 对象
+
 
   return {
     props: task.props,
@@ -572,6 +641,10 @@ var executeTask = function executeTask(fiber) {
    * 构建子级 fiber 对象
    */
   if (fiber.tag === 'class_component') {
+    if (fiber.stateNode.__fiber && fiber.stateNode.__fiber.partialState) {
+      fiber.stateNode.state = _objectSpread(_objectSpread({}, fiber.stateNode.state), fiber.state.__fiber.partialState);
+    }
+
     reconcileChildren(fiber, fiber.stateNode.render());
   } else if (fiber.tag === 'function_component') {
     reconcileChildren(fiber, fiber.stateNode(fiber.props));
@@ -657,6 +730,14 @@ var render = function render(element, dom) {
     props: {
       children: element
     }
+  });
+  requestIdleCallback(performTask);
+};
+var scheduleUpdate = function scheduleUpdate(instance, partialState) {
+  taskQueue.push({
+    from: 'class_component',
+    instance: instance,
+    partialState: partialState
   });
   requestIdleCallback(performTask);
 };
@@ -766,31 +847,46 @@ var Greeting = /*#__PURE__*/function (_Component) {
   var _super = _createSuper(Greeting);
 
   function Greeting(props) {
+    var _this;
+
     _classCallCheck(this, Greeting);
 
-    return _super.call(this, props);
+    _this = _super.call(this, props);
+    _this.state = {
+      name: 'zs'
+    };
+    return _this;
   }
 
   _createClass(Greeting, [{
     key: "render",
     value: function render() {
-      return /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, this.props.title);
+      var _this2 = this;
+
+      return /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, this.props.title, /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("p", null, " ", this.state.name), /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("button", {
+        onClick: function onClick() {
+          return _this2.setState({
+            name: 'ls'
+          });
+        }
+      }, "\u70B9\u6211\u4FEE\u6539\u72B6\u6001"));
     }
   }]);
 
   return Greeting;
-}(_react_Component__WEBPACK_IMPORTED_MODULE_2__["default"]); // render(<Greeting title="奥力给"/>, root)
+}(_react_Component__WEBPACK_IMPORTED_MODULE_2__["default"]);
 
+(0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)( /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement(Greeting, {
+  title: "\u5965\u529B\u7ED9"
+}), root);
 
 function FunctionComponent(props) {
   return /*#__PURE__*/_react__WEBPACK_IMPORTED_MODULE_0__["default"].createElement("div", null, props.title, ", FunctionComponent");
 } // render(<FunctionComponent title="Hello"/>, root)
-
-
-(0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)(jsx, root);
-setTimeout(function () {
-  (0,_react_reconciliation__WEBPACK_IMPORTED_MODULE_1__.render)(jsx2, root);
-}, 2000);
+// render(jsx, root)
+// setTimeout(() => {
+//     render(jsx2, root)
+// }, 2000)
 })();
 
 /******/ })()

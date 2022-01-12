@@ -1,4 +1,4 @@
-import {arrayed, createStateNode, createTaskQueue, getTag} from "../Misc";
+import {arrayed, createStateNode, createTaskQueue, getRoot, getTag} from "../Misc";
 import {updateNodeElement} from "../DOM";
 
 /**
@@ -18,6 +18,11 @@ const commitAllWork = fiber => {
      * 所以即使层级被抹平了，也不会影响到节点的更新、删除、修改
      */
     fiber.effects.forEach(child => {
+        if (child.tag === 'class_component'){
+            // 将类组件的 fiber 备份到实例身上，后续类组件状态更新使用
+            child.stateNode.__fiber = child
+        }
+
         if (child.effectTag === 'delete') {
             child.parent.stateNode.removeChild(child.stateNode)
         } else if (child.effectTag === 'update') {
@@ -58,6 +63,21 @@ const commitAllWork = fiber => {
 const getFirstTask = () => {
     // 获取任务
     const task = taskQueue.pop()
+
+    if (task.from === 'class_component'){
+        // task.instance.__fiber
+        const root = getRoot(task.instance)
+        console.log(root)
+        task.instance.__fiber.partialState = task.partialState
+        return {
+            props: root.props,
+            stateNode: root.stateNode,
+            tag: 'host_root',
+            effects: [],
+            child: null,
+            alternate: root
+        }
+    }
     // 返回最外层节点的 fiber 对象
     return {
         props: task.props,
@@ -162,6 +182,12 @@ const executeTask = fiber => {
      * 构建子级 fiber 对象
      */
     if (fiber.tag === 'class_component') {
+        if (fiber.stateNode.__fiber && fiber.stateNode.__fiber.partialState){
+            fiber.stateNode.state = {
+                ...fiber.stateNode.state,
+                ...fiber.state.__fiber.partialState
+            }
+        }
         reconcileChildren(fiber, fiber.stateNode.render())
     } else if (fiber.tag === 'function_component') {
         reconcileChildren(fiber, fiber.stateNode(fiber.props))
@@ -243,6 +269,17 @@ export const render = (element, dom) => {
     taskQueue.push({
         dom,
         props: {children: element}
+    })
+
+    requestIdleCallback(performTask)
+}
+
+
+export const scheduleUpdate = (instance, partialState) => {
+    taskQueue.push({
+        from: 'class_component',
+        instance,
+        partialState
     })
 
     requestIdleCallback(performTask)
